@@ -1,0 +1,7 @@
+[Unit]
+Description=update-airlock: report failed unit %i
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/update-airlock unit-failed %i
+TimeoutStartSec=2min

@@ -1,0 +1,136 @@
+# update-airlock configuration (/etc/update-airlock/config.yaml)
+#
+# Secrets do NOT belong here. Write them into /etc/update-airlock/.env (chmod 600) and reference them
+# as ${NAME}. Check this file with:  update-airlock validate
+# Every value below shows its default unless marked "example".
+
+general:
+  language: en                    # en | de - language of notifications and sensor names
+  state_dir: /var/lib/update-airlock          # history.db, test reports, notes cache, sandbox work dirs
+  backup_dir: /var/backups/update-airlock     # backups taken before every real update (root only, 700)
+  keep_backups: 3                 # backup sets (and kept previous images) per container
+  log_file: /var/log/update-airlock/update-airlock.log   # rotated by /etc/logrotate.d/update-airlock
+  lock_file: /run/update-airlock.lock
+  metrics_file: /var/lib/prometheus/node-exporter/update_airlock.prom   # node-exporter textfile collector
+  www_dir: /var/www/update-airlock  # static status page (index.html, status.json); "" = off
+  pause_while_active: []          # systemd units; while one of them runs, no test and no update
+  #  - raspiBackup.service        # example: a full-system backup that stops Docker
+  min_free_disk_gb: 5             # reserve that must stay free after a backup
+  max_updates_per_night: 3
+  test_valid_hours: 72            # a passed test older than this is repeated before the update
+
+homeassistant:                    # the PRODUCTION Home Assistant: notifications, sensors, presence, checks
+  url: http://127.0.0.1:8123
+  token: ${HA_TOKEN}              # long-lived access token, see README "Secrets"
+  notify_service: notify.mobile_app_phone     # example; any notify.* service
+  sensor_prefix: sensor.update_airlock        # sensor.update_airlock + sensor.update_airlock_<container>
+  verify_tls: true
+  timeout_seconds: 15
+
+notifications:
+  # which events send a push message
+  events: [held, test_failed, updated, rolled_back, rollback_failed, error, manual_update_available, self_check]
+  repeat_after_hours: 24          # the same message is not repeated within this time
+  repeat_after_hours_by_event: {held: 168, manual_update_available: 168}   # reminders weekly
+
+check:
+  failures_before_alert: 2        # registry / release notes unreachable this many runs in a row -> message
+  github_token: ${GITHUB_TOKEN:-} # optional: higher GitHub API limit for the HA release notes
+  http_timeout_seconds: 20
+  # registry_credentials:         # optional, for private registries ("user:token")
+  #   ghcr.io: ${GHCR_CREDENTIALS}
+
+maintenance:
+  window: "03:40-04:30"           # real updates start only inside this window (may cross midnight)
+  days: []                        # empty = every day; e.g. [mon, tue, wed, thu, fri]
+  presence:
+    enabled: false                # postpone while somebody is at home AND active
+    person: person.me             # example
+    activity_sensors:             # example: "active" = on, or was on within quiet_minutes
+      - binary_sensor.living_room_occupancy
+    quiet_minutes: 20
+    # If Home Assistant cannot be asked, only the fixed window applies.
+
+observe:                          # after a real update (can be overridden per container)
+  minutes: 15                     # how long to watch
+  interval_seconds: 30
+  startup_grace_minutes: 6        # web/unavailable checks start counting after this
+  unavailable_threshold_pp: 10    # roll back if unavailable entities rise more than this (percentage points)
+  web_failures_before_rollback: 4
+
+sandbox:                          # SAFETY: see README "Isolation". Change only if you know why.
+  network: update-airlock-sbx     # internal Docker network (no gateway, no route)
+  subnet: 172.30.98.0/24
+  bridge_name: ua-sbx
+  proxy_ip: 172.30.98.2           # the egress proxy - the only other member of the sandbox network
+  egress_network: update-airlock-egress
+  egress_subnet: 172.30.97.0/24
+  egress_bridge_name: ua-egress
+  proxy_image: update-airlock/egress-proxy:1  # built locally from proxy_base_image on first use
+  proxy_base_image: alpine:3.20
+  proxy_port: 8888
+  proxy_allow_domains: [pypi.org, files.pythonhosted.org, wheels.home-assistant.io]
+  probe_image: alpine:3.20
+  memory: 1536m                   # limits for every test container
+  cpus: "2"
+  pids_limit: 1024
+  work_dir: ""                    # default: <state_dir>/sandbox
+  # Must be unreachable from the sandbox, otherwise every test is aborted.
+  # @gateway = default gateway (router), @host_lan = this host's LAN IP, @host_bridge = host on the sandbox bridge
+  must_be_unreachable: ["@gateway:80", "@host_lan:8123", "@host_lan:22", "@host_bridge:8123",
+                        "@host_bridge:1883", "@host_bridge:22", "1.1.1.1:443", "8.8.8.8:53"]
+  #  - 192.0.2.50:6638            # example: a network Zigbee coordinator - add your real devices here
+  proxy_must_deny: ["@gateway:80", "@host_lan:8123", "example.com:443"]
+  proxy_must_allow: ["pypi.org:443"]
+
+ui:                               # status page (www_dir, served e.g. by nginx on port 8100)
+  home_url: ""                    # optional button back to your dashboard, e.g. http://192.0.2.10:8092/
+  home_label: Dashboard
+
+containers:
+  # One entry per container (the Docker container name). Containers not listed are not touched.
+  #
+  # policy: per update kind - auto (test, then install in the window) | notify (message only) | ignore
+  #   patch / minor / major: version tags (track: semver), or version labels of a floating tag
+  #   digest: the same tag points to a new image and no version can be compared (e.g. :latest)
+  # track: tag    = follow the digest of the tag the container uses now (e.g. :latest, :2, :1.8)
+  #        semver = look for newer version tags matching tag_pattern (the container must use a version tag)
+  # tester: homeassistant | generic | none
+  # notes: homeassistant = read the HA breaking changes and match them with the used integrations
+
+  homeassistant:                  # example
+    tester: homeassistant
+    notes: homeassistant
+    track: semver
+    tag_pattern: '^\d{4}\.\d{1,2}\.\d+$'     # releases only, no betas
+    versioning: calver            # YEAR.MONTH.PATCH: a new month = minor
+    policy: {patch: auto, minor: auto, major: notify, digest: notify}
+    breaking_changes: hold        # hold | notify | ignore
+    hold_on_core_changes: false   # also hold for breaking changes without an integration label
+    priority: 10
+    health: {ha_unavailable: true}            # compare unavailable entities before/after
+    backup:
+      exclude: [backups, "*.db.bak-*", "home-assistant.log*"]
+    test:
+      # config_dir: /srv/homeassistant       # default: host path of the /config mount
+      copy_recorder_db: true      # the DB migration is a typical failure - keep it in the test
+      timeout_minutes: 50
+      settle_seconds: 90
+      new_error_tolerance: 0
+      ignore_error_patterns: []   # regexes for log lines that are never counted
+      # allow_integrations: [...] # config entries that stay enabled in the sandbox (default: harmless ones)
+      # remove_yaml_keys: [...]   # YAML integrations removed from the sandbox copy
+
+  uptime-kuma:                    # example: floating tag ":2", digest changes installed automatically
+    tester: generic
+    policy: {patch: auto, minor: auto, major: notify, digest: auto}
+    priority: 40
+    health: {http_url: "http://127.0.0.1:3001/"}
+    test: {http_port: 3001, stable_seconds: 60}
+    # If a container cannot run in isolation even with its current image (e.g. an exporter that exits without
+    # its device), the test is marked "inconclusive" and still passes - the watch + rollback after the real
+    # update are then the only protection. require_conclusive: true makes such a test fail instead.
+    # test: {require_conclusive: true}
+
+  mqtt-bridge:                    # example: only tell me
+    policy: {patch: notify, minor: notify, major: notify, digest: notify}

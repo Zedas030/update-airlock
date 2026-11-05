@@ -1,0 +1,26 @@
+[Unit]
+Description=update-airlock: install ready updates inside the maintenance window, republish status
+Documentation=file:///opt/update-airlock/app/README.md
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+OnFailure=update-airlock-failure@%n.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/update-airlock apply
+ExecStopPost=/bin/sh -c '[ "$SERVICE_RESULT" = success ] || /usr/local/bin/update-airlock cleanup'
+TimeoutStartSec=3h
+TimeoutStopSec=5min
+Nice=5
+MemoryMax=512M
+CPUQuota=50%
+NoNewPrivileges=yes
+ProtectSystem=full
+PrivateTmp=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectClock=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictRealtime=yes

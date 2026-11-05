@@ -1,0 +1,10 @@
+[Unit]
+Description=update-airlock: every 10 minutes (only acts inside the maintenance window)
+
+[Timer]
+OnBootSec=3min
+OnCalendar=*:0/10
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target

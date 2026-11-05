@@ -1,0 +1,58 @@
+{
+  "title": "Update airlock",
+  "uid": "update-airlock",
+  "tags": ["update-airlock", "docker"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "5m",
+  "time": {"from": "now-7d", "to": "now"},
+  "templating": {"list": [{"name": "ds", "type": "datasource", "query": "prometheus", "label": "Prometheus"}]},
+  "panels": [
+    {
+      "type": "stat", "title": "Hours since last check", "gridPos": {"x": 0, "y": 0, "w": 6, "h": 4},
+      "datasource": {"type": "prometheus", "uid": "${ds}"},
+      "targets": [{"expr": "(time() - update_airlock_last_run_timestamp_seconds{kind=\"check\"}) / 3600", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "h", "decimals": 1, "thresholds": {"mode": "absolute", "steps": [
+        {"color": "green", "value": null}, {"color": "orange", "value": 26}, {"color": "red", "value": 36}]}}}
+    },
+    {
+      "type": "stat", "title": "Sandbox isolation proof", "gridPos": {"x": 6, "y": 0, "w": 6, "h": 4},
+      "datasource": {"type": "prometheus", "uid": "${ds}"},
+      "targets": [{"expr": "update_airlock_sandbox_isolation_ok", "refId": "A"}],
+      "fieldConfig": {"defaults": {"mappings": [{"type": "value", "options": {
+        "0": {"text": "FAILED / not run", "color": "red"}, "1": {"text": "passed", "color": "green"}}}]}}
+    },
+    {
+      "type": "stat", "title": "Source failures (registry / release notes)", "gridPos": {"x": 12, "y": 0, "w": 6, "h": 4},
+      "datasource": {"type": "prometheus", "uid": "${ds}"},
+      "targets": [{"expr": "max(update_airlock_source_failures) or vector(0)", "refId": "A"}],
+      "fieldConfig": {"defaults": {"thresholds": {"mode": "absolute", "steps": [
+        {"color": "green", "value": null}, {"color": "red", "value": 2}]}}}
+    },
+    {
+      "type": "stat", "title": "Rollbacks (total)", "gridPos": {"x": 18, "y": 0, "w": 6, "h": 4},
+      "datasource": {"type": "prometheus", "uid": "${ds}"},
+      "targets": [{"expr": "sum(update_airlock_events_total{action=\"rollback\"}) or vector(0)", "refId": "A"}]
+    },
+    {
+      "type": "table", "title": "Containers", "gridPos": {"x": 0, "y": 4, "w": 24, "h": 10},
+      "datasource": {"type": "prometheus", "uid": "${ds}"},
+      "targets": [
+        {"expr": "update_airlock_update_available", "format": "table", "instant": true, "refId": "A"},
+        {"expr": "update_airlock_container_status", "format": "table", "instant": true, "refId": "B"}
+      ],
+      "transformations": [
+        {"id": "merge"},
+        {"id": "organize", "options": {"excludeByName": {"Time": true, "__name__": true, "instance": true, "job": true,
+          "Value #A": true, "Value #B": true}}}
+      ]
+    },
+    {
+      "type": "timeseries", "title": "Updates, tests and rollbacks", "gridPos": {"x": 0, "y": 14, "w": 24, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "${ds}"},
+      "targets": [{"expr": "increase(update_airlock_events_total{action=~\"update|test|rollback|held\"}[1d])",
+                   "legendFormat": "{{action}} {{result}}", "refId": "A"}],
+      "fieldConfig": {"defaults": {"custom": {"drawStyle": "bars"}}}
+    }
+  ]
+}

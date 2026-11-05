@@ -1,0 +1,26 @@
+# Home Assistant automation: alert when update-airlock has not checked for 36 h or reports an error.
+# Add it via Settings -> Automations -> (three dots) Edit in YAML, or append it to automations.yaml.
+# Replace notify.mobile_app_phone with your notify service.
+id: update_airlock_dead_mans_switch
+alias: "Update airlock: no check for 36 h or error"
+description: "Self-monitoring of update-airlock (sensor.update_airlock is pushed by the tool via the REST API)."
+mode: single
+triggers:
+  - trigger: template
+    value_template: >
+      {{ (now().timestamp() - (state_attr('sensor.update_airlock', 'last_check_ts') | float(0))) > 36 * 3600 }}
+    for: "00:30:00"
+    id: stale
+  - trigger: state
+    entity_id: sensor.update_airlock
+    to: error
+    for: "00:05:00"
+    id: error
+actions:
+  - action: notify.mobile_app_phone
+    data:
+      title: Update airlock
+      message: >
+        {% if trigger.id == 'stale' %}No check for more than 36 h - is the timer running?
+        (systemctl status update-airlock-check.timer)
+        {% else %}Status error: {{ state_attr('sensor.update_airlock', 'containers') }}{% endif %}

@@ -1,0 +1,4 @@
+#!/bin/sh
+# update-airlock command (installed as /usr/local/bin/update-airlock). Needs root (Docker, iptables, backups).
+if [ "$(id -u)" != 0 ]; then exec sudo "$0" "$@"; fi
+PYTHONPATH=/opt/update-airlock/app exec /usr/bin/python3 -m update_airlock "$@"
