@@ -1,4 +1,10 @@
-# update-airlock
+<p align="center">
+  <img src="docs/assets/banner.svg" alt="update-airlock" width="100%">
+</p>
+
+<p align="center">
+  <a href="#features">Features</a>&nbsp;&nbsp;·&nbsp;&nbsp;<a href="#isolation-safety-critical">Isolation</a>&nbsp;&nbsp;·&nbsp;&nbsp;<a href="#installation">Install</a>&nbsp;&nbsp;·&nbsp;&nbsp;<a href="#secrets">Secrets</a>&nbsp;&nbsp;·&nbsp;&nbsp;<a href="README.de.md">Deutsch</a>
+</p>
 
 **Test container updates against a copy of your real configuration before they reach production.**
 update-airlock looks for new images every night, reads the release notes (Home Assistant: breaking
@@ -8,18 +14,10 @@ sandbox with a copy of your data, and only then updates – inside a maintenance
 
 Built for a Home Assistant *Container* install (no Supervisor) on a Raspberry Pi, works for any Docker host.
 
-[Deutsche Anleitung: README.de.md](README.de.md)
-
-```
- daily 00:30                              every 10 min (acts only inside the window, e.g. 03:40-04:30)
- ┌──────────┐  ┌──────────────┐  ┌───────────────┐   ┌──────────────────────────────────────────────┐
- │ registry │→ │ release notes│→ │ sandbox test  │ → │ backup → new image → watch 15 min → keep      │
- │ tags,    │  │ breaking     │  │ baseline vs.  │   │                       └─ unhealthy / web down │
- │ digests  │  │ changes vs.  │  │ candidate on a│   │                          / unavailable ↑ →    │
- │ policy   │  │ used integr. │  │ copy of /config│  │                          ROLLBACK (image+data)│
- └──────────┘  └─────┬────────┘  └──────┬────────┘   └──────────────────────────────────────────────┘
-                     └ held + push       └ failed → no update + push
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/flow-dark.svg">
+  <img src="docs/assets/flow-light.svg" alt="Daily check of registry, release notes and sandbox; inside the window backup, new image, 15-minute watch, keep or rollback" width="100%">
+</picture>
 
 ## Features
 

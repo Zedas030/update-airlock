@@ -1,4 +1,10 @@
-# update-airlock – die Update-Schleuse
+<p align="center">
+  <img src="docs/assets/banner.de.svg" alt="update-airlock, die Update-Schleuse" width="100%">
+</p>
+
+<p align="center">
+  <a href="#wie-es-arbeitet">Wie es arbeitet</a>&nbsp;&nbsp;·&nbsp;&nbsp;<a href="#isolation-der-sandbox">Isolation</a>&nbsp;&nbsp;·&nbsp;&nbsp;<a href="#installation">Installation</a>&nbsp;&nbsp;·&nbsp;&nbsp;<a href="#secrets">Secrets</a>&nbsp;&nbsp;·&nbsp;&nbsp;<a href="README.md">English</a>
+</p>
 
 **Container-Updates zuerst gegen eine Kopie der echten Konfiguration testen, dann aktualisieren, bei
 Problemen automatisch zurückrollen.**
